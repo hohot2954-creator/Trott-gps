@@ -1,7 +1,7 @@
 # Trott-gps
 GPS spécialement trottinette électrique
 name: trott_gps
-description: Application GPS Trottinette
+name: Application GPS Trottinette
 publish_to: 'none'
 version: 1.0.0+1
 
