@@ -1,14 +1,5 @@
-name: trott_gps
-description: Application GPS Trottinette
-publish_to: 'none'
-version: 1.0.0+1
-
-environment:
-  sdk: '>=3.0.0 <4.0.0'
-
-dependencies:
-  flutter:
-    sdk: flutter
-
-flutter:
-  uses-material-design: true
+ - name: Build Debug APK
+        run: |
+          flutter clean
+          flutter pub get
+          flutter build apk --debug --verbose
