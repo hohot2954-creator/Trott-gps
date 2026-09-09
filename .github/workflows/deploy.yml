@@ -1,4 +1,4 @@
-name: Build APK Parfait
+name: Build APK Definitif
 
 on:
   push:
@@ -21,32 +21,14 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0'
+          flutter-version: '3.19.0'
           cache: true
 
-      - name: Injection et Build Infaillible
+      - name: Build APK Sans Soucis
         run: |
           flutter --disable-analytics
-
-          # Si le dossier android n'existe pas, on le crée proprement
-          if [ ! -d "android" ]; then
-            echo "Création de la structure Android..."
-            flutter create . --org com.example.trottgps --project-name trott_gps
-          fi
-
-          # Configuration robuste de Gradle pour accepter les plugins récents (minSdk 21 + multiDex)
-          echo "android.minSdkVersion=21" >> android/local.properties || true
-          echo "android.enableJetifier=true" >> android/gradle.properties || true
-          echo "android.useAndroidX=true" >> android/gradle.properties || true
-
-          # Forcer multidex dans build.gradle si le fichier existe
-          if [ -f "android/app/build.gradle" ]; then
-            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
-          fi
-
-          # Compilation avec les logs de debug détaillés pour ne plus rater l'erreur si elle persiste
           flutter pub get
-          flutter build apk --debug --verbose
+          flutter build apk --debug
 
       - name: Stocker l'APK
         uses: actions/upload-artifact@v4
