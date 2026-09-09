@@ -1,4 +1,21 @@
-name: Build APK Neuf
+name: trott_gps
+description: Application GPS Pro Micro-Mobilité
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_maps_flutter: ^2.5.3
+  geolocator: ^10.1.0
+  flutter_tts: ^3.8.5
+
+flutter:
+  uses-material-design: true
+  name: Build APK Neuf
 
 on:
   push:
