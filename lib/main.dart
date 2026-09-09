@@ -38,15 +38,22 @@ class _MapScreenState extends State<MapScreen> {
     zoom: 14.0,
   );
 
-  // Catégories unifiées (Trottinette, Mobylette, Moto 50cc)
   String _selectedCategory = 'Trottinette';
   final List<String> _categories = ['Trottinette', 'Mobylette', 'Moto 50cc'];
 
-  // Types de trajets et profils regroupés
   String _selectedRouteType = 'Rapide';
   final List<String> _routeTypes = ['Rapide', 'Simple', 'Long', 'Balade'];
 
+  // Données de vitesse et de la séance en cours
   double _currentSpeed = 0.0;
+  double _totalDistanceMeters = 0.0; // Distance totale en mètres
+  Position? _lastPosition; // Pour calculer la distance entre 2 points GPS
+  
+  // Chrono de la session
+  Timer? _sessionTimer;
+  int _secondsElapsed = 0;
+  bool _isSessionActive = false;
+
   StreamSubscription<Position>? _positionStreamSubscription;
   late FlutterTts _flutterTts;
   final Set<Marker> _markers = {};
@@ -67,6 +74,33 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _speak(String text) async {
     await _flutterTts.speak(text);
+  }
+
+  // Démarrer ou arrêter la séance d'enregistrement
+  void _toggleSession() {
+    setState(() {
+      _isSessionActive = !_isSessionActive;
+      if (_isSessionActive) {
+        _secondsElapsed = 0;
+        _totalDistanceMeters = 0.0;
+        _lastPosition = null;
+        _sessionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          setState(() {
+            _secondsElapsed++;
+          });
+        });
+        _speak("Séance enregistrée démarrée");
+      } else {
+        _sessionTimer?.cancel();
+        _speak("Séance arrêtée. Bilan enregistré.");
+      }
+    });
+  }
+
+  String _formatTime(int seconds) {
+    int minutes = seconds ~/ 60;
+    int remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   void _loadControlsAndRadars() {
@@ -135,6 +169,21 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         double speedKmh = (position.speed >= 0) ? position.speed * 3.6 : 0.0;
         _currentSpeed = speedKmh < 0.8 ? 0.0 : speedKmh;
+
+        // Si la séance est active, on calcule la distance parcourue automatiquement
+        if (_isSessionActive && _lastPosition != null) {
+          double distanceInMeters = Geolocator.distanceBetween(
+            _lastPosition!.latitude,
+            _lastPosition!.longitude,
+            position.latitude,
+            position.longitude,
+          );
+          // On filtre les petits sauts GPS aberrants (bruit)
+          if (distanceInMeters > 1.0 && distanceInMeters < 100.0) {
+            _totalDistanceMeters += distanceInMeters;
+          }
+        }
+        _lastPosition = position;
       });
     });
   }
@@ -142,6 +191,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void dispose() {
     _positionStreamSubscription?.cancel();
+    _sessionTimer?.cancel();
     _flutterTts.stop();
     super.dispose();
   }
@@ -152,6 +202,18 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: Text('GPS - Mode : $_selectedCategory'),
         backgroundColor: Colors.grey[900],
+        actions: [
+          // Bouton direct pour lancer/arrêter l'enregistrement de séance
+          IconButton(
+            icon: Icon(
+              _isSessionActive ? Icons.stop_circle : Icons.fiber_manual_record,
+              color: _isSessionActive ? Colors.redAccent : Colors.greenAccent,
+              size: 30,
+            ),
+            onPressed: _toggleSession,
+            tooltip: _isSessionActive ? 'Arrêter l\'enregistrement' : 'Démarrer l\'enregistrement',
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -165,6 +227,8 @@ class _MapScreenState extends State<MapScreen> {
               _controller = controller;
             },
           ),
+          
+          // Compteur de vitesse + Tableau de bord de séance en direct
           Positioned(
             top: 20,
             left: 20,
@@ -173,7 +237,10 @@ class _MapScreenState extends State<MapScreen> {
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.85),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.cyanAccent.withOpacity(0.5), width: 2),
+                border: Border.all(
+                  color: _isSessionActive ? Colors.redAccent : Colors.cyanAccent.withOpacity(0.5), 
+                  width: 2,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.5),
@@ -205,17 +272,37 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
                   const Divider(color: Colors.white24, height: 12),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.bolt, size: 14, color: Colors.amberAccent),
-                      SizedBox(width: 4),
-                      Text(
-                        'Optimisé Micro-Mobilité',
-                        style: TextStyle(fontSize: 10, color: Colors.white70),
-                      ),
-                    ],
-                  ),
+                  // Affichage de la séance en direct si active
+                  if (_isSessionActive) ...[
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.straighten, size: 14, color: Colors.amberAccent),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${(_totalDistanceMeters / 1000).toStringAsFixed(2)} km',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.timer, size: 14, color: Colors.greenAccent),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatTime(_secondsElapsed),
+                          style: const TextStyle(fontSize: 12, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    const Text(
+                      'Séance en pause',
+                      style: TextStyle(fontSize: 10, color: Colors.grey),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -228,7 +315,6 @@ class _MapScreenState extends State<MapScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Barre unique de sélection de catégorie (Trottinette / Mobylette / Moto 50cc)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: _categories.map((cat) {
@@ -255,7 +341,6 @@ class _MapScreenState extends State<MapScreen> {
               }).toList(),
             ),
             const SizedBox(height: 8),
-            // Barre unique des types de trajets
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: _routeTypes.map((type) {
