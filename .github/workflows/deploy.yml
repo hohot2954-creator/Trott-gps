@@ -2,36 +2,35 @@ name: Build APK Neuf
 
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Retirer le dépôt
+        uses: actions/checkout@v3
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Configurer Java
+        uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
+          distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Flutter
+      - name: Configurer Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: '3.16.0'
+          cache: true
 
-      - name: Generation et Build Direct
+      - name: Build APK Direct
         run: |
-          flutter create . --org com.example.trottgps --project-name trott_gps
           flutter pub get
           flutter build apk --debug
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Stocker l'APK
+        uses: actions/upload-artifact@v3
         with:
           name: app-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
