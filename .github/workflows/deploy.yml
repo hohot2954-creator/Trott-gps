@@ -1,57 +1,267 @@
-name: Build APK Neuf
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
-on:
-  push:
-    branches: [ "main" ]
+void main() {
+  runApp(const TrottGpsApp());
+}
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+class TrottGpsApp extends StatelessWidget {
+  const TrottGpsApp({super.key});
 
-    steps:
-      - name: Retirer le dépôt
-        uses: actions/checkout@v4
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'GPS Pro Micro-Mobilité',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primarySwatch: Colors.blue,
+      ),
+      home: const MapScreen(),
+    );
+  }
+}
 
-      - name: Configurer Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'zulu'
-          java-version: '17'
+class MapScreen extends StatefulWidget {
+  const MapScreen({super.key});
 
-      - name: Configurer Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.16.0'
-          cache: true
+  @override
+  State<MapScreen> createState() => _MapScreenState();
+}
 
-      - name: Recréer et Compiler Proprement
-        run: |
-          flutter --disable-analytics
+class _MapScreenState extends State<MapScreen> {
+  GoogleMapController? _controller;
+  static const CameraPosition _initialPosition = CameraPosition(
+    target: LatLng(45.75, 4.85),
+    zoom: 14.0,
+  );
 
-          # Sauvegarder le code actuel
-          mkdir -p temp_backup
-          cp lib/main.dart temp_backup/
-          cp pubspec.yaml temp_backup/
+  String _selectedCategory = 'Trottinette';
+  final List<String> _categories = ['Trottinette', 'Mobylette', 'Moto 50cc'];
 
-          # Supprimer les anciens fichiers
-          rm -rf android ios lib web windows linux macos pubspec.yaml
+  double _currentSpeed = 0.0;
+  double _totalDistanceMeters = 0.0;
+  Position? _lastPosition;
+  
+  Timer? _sessionTimer;
+  int _secondsElapsed = 0;
+  bool _isSessionActive = false;
 
-          # Recréer le projet propre
-          flutter create . --org com.example.trottgps --project-name trott_gps
+  StreamSubscription<Position>? _positionStreamSubscription;
+  late FlutterTts _flutterTts;
+  final Set<Marker> _markers = {};
 
-          # Restaurer le main.dart et le pubspec.yaml
-          cp temp_backup/main.dart lib/
-          cp temp_backup/pubspec.yaml ./
+  @override
+  void initState() {
+    super.initState();
+    _initTts();
+    _loadControlsAndRadars();
+    _checkLocationPermissionAndStart();
+  }
 
-          # Forcer le minSdkVersion à 21 dans le build.gradle Android
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
+  Future<void> _initTts() async {
+    _flutterTts = FlutterTts();
+    await _flutterTts.setLanguage("fr-FR");
+    await _flutterTts.setSpeechRate(0.5);
+  }
 
-          # Lancer la compilation de l'APK de debug
-          flutter pub get
-          flutter build apk --debug
+  Future<void> _speak(String text) async {
+    await _flutterTts.speak(text);
+  }
 
-      - name: Stocker l'APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
+  void _toggleSession() {
+    setState(() {
+      _isSessionActive = !_isSessionActive;
+      if (_isSessionActive) {
+        _secondsElapsed = 0;
+        _totalDistanceMeters = 0.0;
+        _lastPosition = null;
+        _sessionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          setState(() {
+            _secondsElapsed++;
+          });
+        });
+        _speak("Séance enregistrée démarrée");
+      } else {
+        _sessionTimer?.cancel();
+        _speak("Séance arrêtée.");
+      }
+    });
+  }
+
+  String _formatTime(int seconds) {
+    int minutes = seconds ~/ 60;
+    int remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  void _loadControlsAndRadars() {
+    setState(() {
+      _markers.add(
+        const Marker(
+          markerId: MarkerId('radar_1'),
+          position: LatLng(45.760, 4.865),
+          infoWindow: InfoWindow(title: '📷 Radar Fixe', snippet: 'Attention'),
+        ),
+      );
+    });
+  }
+
+  Future<void> _checkLocationPermissionAndStart() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+    if (permission == LocationPermission.deniedForever) return;
+
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 2,
+    );
+
+    _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen((Position position) {
+      setState(() {
+        double speedKmh = (position.speed >= 0) ? position.speed * 3.6 : 0.0;
+        _currentSpeed = speedKmh < 0.8 ? 0.0 : speedKmh;
+
+        if (_isSessionActive && _lastPosition != null) {
+          double distanceInMeters = Geolocator.distanceBetween(
+            _lastPosition!.latitude,
+            _lastPosition!.longitude,
+            position.latitude,
+            position.longitude,
+          );
+          if (distanceInMeters > 1.0 && distanceInMeters < 100.0) {
+            _totalDistanceMeters += distanceInMeters;
+          }
+        }
+        _lastPosition = position;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel();
+    _sessionTimer?.cancel();
+    _flutterTts.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('GPS - $_selectedCategory'),
+        backgroundColor: Colors.grey[900],
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isSessionActive ? Icons.stop_circle : Icons.fiber_manual_record,
+              color: _isSessionActive ? Colors.redAccent : Colors.greenAccent,
+              size: 30,
+            ),
+            onPressed: _toggleSession,
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          GoogleMap(
+            mapType: MapType.satellite,
+            initialCameraPosition: _initialPosition,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+            markers: _markers,
+            onMapCreated: (GoogleMapController controller) {
+              _controller = controller;
+            },
+          ),
+          Positioned(
+            top: 20,
+            left: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _isSessionActive ? Colors.redAccent : Colors.cyanAccent.withOpacity(0.5), 
+                  width: 2,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _currentSpeed.toStringAsFixed(0),
+                    style: const TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.cyanAccent,
+                      height: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'KM/H',
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                  if (_isSessionActive) ...[
+                    const Divider(color: Colors.white24, height: 12),
+                    Text(
+                      '${(_totalDistanceMeters / 1000).toStringAsFixed(2)} km',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amberAccent),
+                    ),
+                    Text(
+                      _formatTime(_secondsElapsed),
+                      style: const TextStyle(fontSize: 11, color: Colors.white70),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        color: Colors.grey[900],
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: _categories.map((cat) {
+            bool isSelected = _selectedCategory == cat;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: ChoiceChip(
+                label: Text(cat),
+                selected: isSelected,
+                selectedColor: Colors.amber,
+                backgroundColor: Colors.grey[800],
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.black : Colors.white70,
+                  fontWeight: FontWeight.bold,
+                ),
+                onSelected: (bool selected) {
+                  setState(() {
+                    _selectedCategory = cat;
+                  });
+                  _speak("Profil $cat");
+                },
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
