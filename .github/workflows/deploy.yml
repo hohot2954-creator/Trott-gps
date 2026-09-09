@@ -1,4 +1,4 @@
-name: Build Propre Direct
+name: Build APK Parfait
 
 on:
   push:
@@ -24,8 +24,20 @@ jobs:
           flutter-version: '3.16.0'
           cache: true
 
-      - name: Build APK
+      - name: Injection et Build Infaillible
         run: |
+          flutter --disable-analytics
+
+          # Si le dossier android n'existe pas dans ton dépôt GitHub, on le crée proprement aux normes
+          if [ ! -d "android" ]; then
+            echo "Création de la structure Android manquante..."
+            flutter create . --org com.example.trottgps --project-name trott_gps
+          fi
+
+          # Forcer le minSdk à 21 pour valider les plugins récents
+          echo "minSdkVersion = 21" >> android/local.properties || true
+
+          # Compilation directe de l'APK
           flutter pub get
           flutter build apk --debug
 
@@ -33,4 +45,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: build/app/outputs/flutter
+          path: build/app/outputs/flutter-apk/app-debug.apk
