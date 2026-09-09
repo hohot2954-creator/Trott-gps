@@ -1,8 +1,0 @@
-      - name: Build Debug APK avec déblocage Gradle
-        run: |
-          cd android
-          ./gradlew clean
-          cd ..
-          flutter clean
-          flutter pub get
-          flutter build apk --debug
