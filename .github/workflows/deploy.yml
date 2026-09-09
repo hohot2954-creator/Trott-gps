@@ -39,9 +39,11 @@ jobs:
             sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
           fi
 
-          # Mettre à jour la version de Kotlin dans le build.gradle racine pour éliminer l'erreur
-          if [ -f "android/build.gradle" ]; then
-            sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '1.9.0'/g" android/build.gradle
+          # Mettre à jour la version de Kotlin dans settings.gradle (utilisé par Flutter moderne)
+          if [ -f "android/settings.gradle" ]; then
+            echo "Mise à jour de Kotlin dans android/settings.gradle"
+            sed -i 's/version "1.8.22" apply false/version "1.9.0" apply false/g' android/settings.gradle || true
+            sed -i 's/kotlin-version = .*/kotlin-version = "1.9.0"/g' android/settings.gradle || true
           fi
 
           flutter pub get
