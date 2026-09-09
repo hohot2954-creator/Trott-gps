@@ -27,6 +27,13 @@ jobs:
       - name: Build APK Sans Soucis
         run: |
           flutter --disable-analytics
+
+          # Si le dossier android n'existe pas, on le génère automatiquement
+          if [ ! -d "android" ]; then
+            echo "Génération de la structure Android du projet..."
+            flutter create . --org com.example.trottgps --project-name trott_gps
+          fi
+
           flutter pub get
           flutter build apk --debug
 
