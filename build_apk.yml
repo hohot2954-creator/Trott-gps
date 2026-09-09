@@ -1,4 +1,3 @@
-name: Build Flutter APK.
 name: Build Flutter APK
 
 on:
@@ -27,6 +26,9 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
           cache: true
+
+      - name: Create Android files
+        run: flutter create . --platforms=android --org com.example.trottgps
 
       - name: Install dependencies
         run: flutter pub get
