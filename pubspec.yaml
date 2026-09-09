@@ -1,4 +1,4 @@
-name: Build APK Anti-Bug Absolu
+name: Build APK GPS Route Directe
 
 on:
   push:
@@ -24,44 +24,46 @@ jobs:
           flutter-version: '3.16.5'
           cache: true
 
-      - name: Build APK Ultra Blinde
+      - name: Build APK Final et Propre
         run: |
           flutter --disable-analytics
 
-          # 1. On crée le projet s'il n'existe pas
-          if [ ! -d "android" ]; then
-            flutter create . --org com.example.trottgps --project-name trott_gps
-          fi
+          # ON NETTOIE TOUT LE PROJET À LA RACINE SAUF LE DOSSIER .git POUR ÉVITER LES CONFLITS DE FICHIERS DE CONFIG
+          find . -maxdepth 1 ! -name '.' ! -name '..' ! -name '.git' ! -name '.github' -exec rm -rf {} +
 
-          # 2. ON ÉCRASE LE PUBSPEC.YAML APRÈS LA CRÉATION (pour être sûr qu'il n'est pas écrasé)
+          # ON CRÉE UN PROJET FLUTTER NEUF PROPREMENT DE ZÉRO
+          flutter create . --org com.example.trottgps --project-name trott_gps
+
+          # ON ÉCRASE LE PUBSPEC.YAML FRAÎCHEMENT CRÉÉ AVEC NOTRE VERSION COMPLÈTE ET SA CONTRAINTE SDK VALIDE
           rm -f pubspec.yaml
-          touch pubspec.yaml
-          echo "name: trott_gps" >> pubspec.yaml
-          echo "description: GPS Pro pour micro-mobilite" >> pubspec.yaml
-          echo "publish_to: 'none'" >> pubspec.yaml
-          echo "version: 1.0.0+1" >> pubspec.yaml
-          echo "" >> pubspec.yaml
-          echo "environment:" >> pubspec.yaml
-          echo "  sdk: '>=3.0.0 <4.0.0'" >> pubspec.yaml
-          echo "" >> pubspec.yaml
-          echo "dependencies:" >> pubspec.yaml
-          echo "  flutter:" >> pubspec.yaml
-          echo "    sdk: flutter" >> pubspec.yaml
-          echo "  flutter_map: ^6.1.0" >> pubspec.yaml
-          echo "  latlong2: ^0.9.0" >> pubspec.yaml
-          echo "  geolocator: ^10.1.0" >> pubspec.yaml
-          echo "  flutter_tts: ^3.8.3" >> pubspec.yaml
-          echo "  http: ^1.2.0" >> pubspec.yaml
-          echo "" >> pubspec.yaml
-          echo "dev_dependencies:" >> pubspec.yaml
-          echo "  flutter_test:" >> pubspec.yaml
-          echo "    sdk: flutter" >> pubspec.yaml
-          echo "  flutter_lints: ^3.0.0" >> pubspec.yaml
-          echo "" >> pubspec.yaml
-          echo "flutter:" >> pubspec.yaml
-          echo "  uses-material-design: true" >> pubspec.yaml
+          cat << 'EOF' > pubspec.yaml
+          name: trott_gps
+          description: GPS Pro pour micro-mobilite
+          publish_to: 'none'
+          version: 1.0.0+1
 
-          # 3. Forcer le minSdk à 21
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+
+          dependencies:
+            flutter:
+              sdk: flutter
+            flutter_map: ^6.1.0
+            latlong2: ^0.9.0
+            geolocator: ^10.1.0
+            flutter_tts: ^3.8.3
+            http: ^1.2.0
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^3.0.0
+
+          flutter:
+            uses-material-design: true
+          EOF
+
+          # ON FORCERA ENSUITE LE MINSDK À 21 DANS LE BUILD.GRADLE GÉNÉRÉ
           if [ -f "android/app/build.gradle" ]; then
             sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
           fi
