@@ -1,24 +1,46 @@
-name: trott_gps
-description: GPS Pro pour micro-mobilite
-publish_to: 'none'
-version: 1.0.0+1
+name: Build APK Definitif
 
-environment:
-  sdk: '>=3.0.0 <4.0.0'
+on:
+  push:
+    branches: [ "main" ]
 
-dependencies:
-  flutter:
-    sdk: flutter
-  flutter_map: ^6.1.0
-  latlong2: ^0.9.0
-  geolocator: ^10.1.0
-  flutter_tts: ^3.8.3
-  http: ^1.2.0
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
+    steps:
+      - name: Checkout depot
+        uses: actions/checkout@v4
 
-flutter:
-  uses-material-design: true
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.5'
+          cache: true
+
+      - name: Build APK Final
+        run: |
+          flutter --disable-analytics
+          flutter clean
+          flutter pub get
+
+          # Forçage propre du minSdk à 21 dans build.gradle s'il existe
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
+            sed -i 's/minSdkVersion 16/minSdkVersion 21/g' android/app/build.gradle
+            sed -i 's/minSdkVersion 19/minSdkVersion 21/g' android/app/build.gradle
+          fi
+
+          flutter build apk --debug
+
+      - name: Stocker l'APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
