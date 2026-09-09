@@ -1,4 +1,4 @@
-name: Build APK Definitif
+name: Build APK Micro-Mobilité
 
 on:
   push:
@@ -21,17 +21,20 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.22.0'
           cache: true
 
-      - name: Build APK Sans Soucis
+      - name: Build APK Propre
         run: |
           flutter --disable-analytics
 
-          # Si le dossier android n'existe pas, on le génère automatiquement
           if [ ! -d "android" ]; then
-            echo "Génération de la structure Android du projet..."
             flutter create . --org com.example.trottgps --project-name trott_gps
+          fi
+
+          # FORCER LE minSdk À 21 pour satisfaire les plugins récents (OpenStreetMap, Geolocator, etc.)
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
           fi
 
           flutter pub get
