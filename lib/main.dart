@@ -43,32 +43,29 @@ class _MapScreenState extends State<MapScreen> {
   double _currentSpeed = 0.0;
   StreamSubscription<Position>? _positionStreamSubscription;
 
-  // Ensemble des marqueurs (Contrôles de police et Radars)
+  // Ensemble des marqueurs (Police et Radars)
   final Set<Marker> _markers = {};
 
   @override
   void initState() {
     super.initState();
-    _loadControlsAndRadars(); // Charger automatiquement la police et les radars
+    _loadControlsAndRadars();
     _checkLocationPermissionAndStart();
   }
 
-  // Charger automatiquement les contrôles de police et les radars à visualiser
+  // Chargement automatique des contrôles de police et des radars
   void _loadControlsAndRadars() {
-    // 1. Zones de contrôle de police (Marqueurs rouges)
     final List<LatLng> policeLocations = [
       const LatLng(45.755, 4.852),
       const LatLng(45.742, 4.840),
     ];
 
-    // 2. Radars fixes (Marqueurs oranges)
     final List<LatLng> radarLocations = [
       const LatLng(45.760, 4.865),
       const LatLng(45.735, 4.830),
     ];
 
     setState(() {
-      // Ajout de la police
       for (int i = 0; i < policeLocations.length; i++) {
         _markers.add(
           Marker(
@@ -83,7 +80,6 @@ class _MapScreenState extends State<MapScreen> {
         );
       }
 
-      // Ajout des radars
       for (int i = 0; i < radarLocations.length; i++) {
         _markers.add(
           Marker(
@@ -138,12 +134,12 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Trott GPS - Radars & Police'),
+        title: const Text('Trott GPS - Navigation'),
         backgroundColor: Colors.grey[900],
       ),
       body: Stack(
         children: [
-          // 1. La carte satellite en fond avec police et radars
+          // 1. Carte Google Maps en mode Satellite
           GoogleMap(
             mapType: MapType.satellite,
             initialCameraPosition: _initialPosition,
@@ -155,7 +151,7 @@ class _MapScreenState extends State<MapScreen> {
             },
           ),
 
-          // 2. Le compteur de vitesse style Waze-clean en haut à gauche
+          // 2. Compteur de vitesse en haut à gauche (style Waze épuré)
           Positioned(
             top: 20,
             left: 20,
@@ -201,6 +197,7 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ],
       ),
+      // 3. Barre de choix des modes de trajet en bas
       bottomNavigationBar: Container(
         color: Colors.grey[900],
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
