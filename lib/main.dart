@@ -41,15 +41,10 @@ class _MapScreenState extends State<MapScreen> {
   String _selectedCategory = 'Trottinette';
   final List<String> _categories = ['Trottinette', 'Mobylette', 'Moto 50cc'];
 
-  String _selectedRouteType = 'Rapide';
-  final List<String> _routeTypes = ['Rapide', 'Simple', 'Long', 'Balade'];
-
-  // Données de vitesse et de la séance en cours
   double _currentSpeed = 0.0;
-  double _totalDistanceMeters = 0.0; // Distance totale en mètres
-  Position? _lastPosition; // Pour calculer la distance entre 2 points GPS
+  double _totalDistanceMeters = 0.0;
+  Position? _lastPosition;
   
-  // Chrono de la session
   Timer? _sessionTimer;
   int _secondsElapsed = 0;
   bool _isSessionActive = false;
@@ -76,7 +71,6 @@ class _MapScreenState extends State<MapScreen> {
     await _flutterTts.speak(text);
   }
 
-  // Démarrer ou arrêter la séance d'enregistrement
   void _toggleSession() {
     setState(() {
       _isSessionActive = !_isSessionActive;
@@ -92,7 +86,7 @@ class _MapScreenState extends State<MapScreen> {
         _speak("Séance enregistrée démarrée");
       } else {
         _sessionTimer?.cancel();
-        _speak("Séance arrêtée. Bilan enregistré.");
+        _speak("Séance arrêtée.");
       }
     });
   }
@@ -104,45 +98,116 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _loadControlsAndRadars() {
-    final List<LatLng> policeLocations = [
-      const LatLng(45.755, 4.852),
-      const LatLng(45.742, 4.840),
-    ];
+    setState(() {
+      _markers.add(
+        const Marker(
+          markerId: MarkerId('radar_1'),
+          position: LatLng(45.760, 4.865),
+          infoWindow: InfoWindow(title: '📷 Radar Fixe', snippet: 'Attention'),
+        ),
+      );
+    });
+  }
 
-    final List<LatLng> radarLocations = [
-      const LatLng(45.760, 4.865),
-      const LatLng(45.735, 4.830),
-    ];
+  // Fonction pour ajouter un signalement communautaire en direct sur la carte
+  void _addCommunityAlert(String type, LatLng position) {
+    String markerIdVal = 'alert_${DateTime.now().millisecondsSinceEpoch}';
+    String title = '';
+    
+    switch (type) {
+      case 'police':
+        title = '👮 Police / Contrôle';
+        break;
+      case 'municipal':
+        title = '🚓 Police Municipale';
+        break;
+      case 'danger':
+        title = '⚠️ Danger / Nid-de-poule';
+        break;
+      default:
+        title = '📍 Signalement';
+    }
 
     setState(() {
-      for (int i = 0; i < policeLocations.length; i++) {
-        _markers.add(
-          Marker(
-            markerId: MarkerId('police_zone_$i'),
-            position: policeLocations[i],
-            infoWindow: const InfoWindow(
-              title: '🚨 Zone de Contrôle Police',
-              snippet: 'Soyez vigilant',
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+      _markers.add(
+        Marker(
+          markerId: MarkerId(markerIdVal),
+          position: position,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            type == 'danger' ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueAzure,
           ),
-        );
-      }
-
-      for (int i = 0; i < radarLocations.length; i++) {
-        _markers.add(
-          Marker(
-            markerId: MarkerId('radar_zone_$i'),
-            position: radarLocations[i],
-            infoWindow: const InfoWindow(
-              title: '📷 Radar Fixe',
-              snippet: 'Attention à la vitesse',
-            ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          ),
-        );
-      }
+          infoWindow: InfoWindow(title: title, snippet: 'Ajouté par la communauté à l\'instant'),
+        ),
+      );
     });
+
+    _speak("Alerte $title enregistrée et partagée");
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Signalement '$title' publié avec succès !"),
+        backgroundColor: Colors.blueGrey,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Ouvre le menu de choix pour signaler un événement autour de soi
+  void _showReportDialog() {
+    if (_lastPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Attente de la position GPS..."), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    LatLng currentLatLng = LatLng(_lastPosition!.latitude, _lastPosition!.longitude);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '🚨 Signaler un événement en direct',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amberAccent),
+              ),
+              const SizedBox(height: 15),
+              ListTile(
+                leading: const Icon(Icons.local_police, color: Colors.blueAccent, size: 30),
+                title: const Text('Police / Contrôle de vitesse', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _addCommunityAlert('police', currentLatLng);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.security, color: Colors.indigoAccent, size: 30),
+                title: const Text('Police Municipale', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _addCommunityAlert('municipal', currentLatLng);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.warning_amber, color: Colors.orangeAccent, size: 30),
+                title: const Text('Danger / Route abîmée / Verglas', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _addCommunityAlert('danger', currentLatLng);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _checkLocationPermissionAndStart() async {
@@ -157,7 +222,6 @@ class _MapScreenState extends State<MapScreen> {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) return;
     }
-
     if (permission == LocationPermission.deniedForever) return;
 
     const LocationSettings locationSettings = LocationSettings(
@@ -170,7 +234,6 @@ class _MapScreenState extends State<MapScreen> {
         double speedKmh = (position.speed >= 0) ? position.speed * 3.6 : 0.0;
         _currentSpeed = speedKmh < 0.8 ? 0.0 : speedKmh;
 
-        // Si la séance est active, on calcule la distance parcourue automatiquement
         if (_isSessionActive && _lastPosition != null) {
           double distanceInMeters = Geolocator.distanceBetween(
             _lastPosition!.latitude,
@@ -178,7 +241,6 @@ class _MapScreenState extends State<MapScreen> {
             position.latitude,
             position.longitude,
           );
-          // On filtre les petits sauts GPS aberrants (bruit)
           if (distanceInMeters > 1.0 && distanceInMeters < 100.0) {
             _totalDistanceMeters += distanceInMeters;
           }
@@ -200,10 +262,9 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('GPS - Mode : $_selectedCategory'),
+        title: Text('GPS - $_selectedCategory'),
         backgroundColor: Colors.grey[900],
         actions: [
-          // Bouton direct pour lancer/arrêter l'enregistrement de séance
           IconButton(
             icon: Icon(
               _isSessionActive ? Icons.stop_circle : Icons.fiber_manual_record,
@@ -211,7 +272,6 @@ class _MapScreenState extends State<MapScreen> {
               size: 30,
             ),
             onPressed: _toggleSession,
-            tooltip: _isSessionActive ? 'Arrêter l\'enregistrement' : 'Démarrer l\'enregistrement',
           ),
         ],
       ),
@@ -227,8 +287,6 @@ class _MapScreenState extends State<MapScreen> {
               _controller = controller;
             },
           ),
-          
-          // Compteur de vitesse + Tableau de bord de séance en direct
           Positioned(
             top: 20,
             left: 20,
@@ -241,13 +299,6 @@ class _MapScreenState extends State<MapScreen> {
                   color: _isSessionActive ? Colors.redAccent : Colors.cyanAccent.withOpacity(0.5), 
                   width: 2,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -264,43 +315,17 @@ class _MapScreenState extends State<MapScreen> {
                   const SizedBox(height: 2),
                   const Text(
                     'KM/H',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white70,
-                      letterSpacing: 1.2,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
                   ),
-                  const Divider(color: Colors.white24, height: 12),
-                  // Affichage de la séance en direct si active
                   if (_isSessionActive) ...[
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.straighten, size: 14, color: Colors.amberAccent),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${(_totalDistanceMeters / 1000).toStringAsFixed(2)} km',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                      ],
+                    const Divider(color: Colors.white24, height: 12),
+                    Text(
+                      '${(_totalDistanceMeters / 1000).toStringAsFixed(2)} km',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amberAccent),
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.timer, size: 14, color: Colors.greenAccent),
-                        const SizedBox(width: 4),
-                        Text(
-                          _formatTime(_secondsElapsed),
-                          style: const TextStyle(fontSize: 12, color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ] else ...[
-                    const Text(
-                      'Séance en pause',
-                      style: TextStyle(fontSize: 10, color: Colors.grey),
+                    Text(
+                      _formatTime(_secondsElapsed),
+                      style: const TextStyle(fontSize: 11, color: Colors.white70),
                     ),
                   ],
                 ],
@@ -309,60 +334,39 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showReportDialog,
+        backgroundColor: Colors.redAccent,
+        icon: const Icon(Icons.campaign, color: Colors.white),
+        label: const Text('Signaler', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
       bottomNavigationBar: Container(
         color: Colors.grey[900],
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: _categories.map((cat) {
-                bool isSelected = _selectedCategory == cat;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: ChoiceChip(
-                    label: Text(cat),
-                    selected: isSelected,
-                    selectedColor: Colors.amber,
-                    backgroundColor: Colors.grey[800],
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.black : Colors.white70,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    onSelected: (bool selected) {
-                      setState(() {
-                        _selectedCategory = cat;
-                      });
-                      _speak("Profil $cat activé");
-                    },
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: _routeTypes.map((type) {
-                bool isSelected = _selectedRouteType == type;
-                return ChoiceChip(
-                  label: Text(type),
-                  selected: isSelected,
-                  selectedColor: Colors.cyan,
-                  backgroundColor: Colors.grey[800],
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.black : Colors.white70,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  onSelected: (bool selected) {
-                    setState(() {
-                      _selectedRouteType = type;
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-          ],
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: _categories.map((cat) {
+            bool isSelected = _selectedCategory == cat;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: ChoiceChip(
+                label: Text(cat),
+                selected: isSelected,
+                selectedColor: Colors.amber,
+                backgroundColor: Colors.grey[800],
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.black : Colors.white70,
+                  fontWeight: FontWeight.bold,
+                ),
+                onSelected: (bool selected) {
+                  setState(() {
+                    _selectedCategory = cat;
+                  });
+                  _speak("Profil $cat");
+                },
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
