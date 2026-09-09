@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 
 void main() {
   runApp(const TrottGpsApp());
@@ -11,8 +13,11 @@ class TrottGpsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Trott GPS - Trajets',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      title: 'Trott GPS Pro',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primarySwatch: Colors.blue,
+      ),
       home: const MapScreen(),
     );
   }
@@ -26,51 +31,179 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
+  GoogleMapController? _controller;
   static const CameraPosition _initialPosition = CameraPosition(
     target: LatLng(45.75, 4.85),
     zoom: 14.0,
   );
 
-  // Mode de trajet sélectionné par défaut
   String _selectedRouteType = 'Rapide';
-
   final List<String> _routeTypes = ['Rapide', 'Simple', 'Long', 'Balade'];
+
+  double _currentSpeed = 0.0;
+  StreamSubscription<Position>? _positionStreamSubscription;
+
+  // Ensemble des marqueurs (Contrôles de police et Radars)
+  final Set<Marker> _markers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadControlsAndRadars(); // Charger automatiquement la police et les radars
+    _checkLocationPermissionAndStart();
+  }
+
+  // Charger automatiquement les contrôles de police et les radars à visualiser
+  void _loadControlsAndRadars() {
+    // 1. Zones de contrôle de police (Marqueurs rouges)
+    final List<LatLng> policeLocations = [
+      const LatLng(45.755, 4.852),
+      const LatLng(45.742, 4.840),
+    ];
+
+    // 2. Radars fixes (Marqueurs oranges)
+    final List<LatLng> radarLocations = [
+      const LatLng(45.760, 4.865),
+      const LatLng(45.735, 4.830),
+    ];
+
+    setState(() {
+      // Ajout de la police
+      for (int i = 0; i < policeLocations.length; i++) {
+        _markers.add(
+          Marker(
+            markerId: MarkerId('police_zone_$i'),
+            position: policeLocations[i],
+            infoWindow: const InfoWindow(
+              title: '🚨 Zone de Contrôle Police',
+              snippet: 'Soyez vigilant en trottinette',
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          ),
+        );
+      }
+
+      // Ajout des radars
+      for (int i = 0; i < radarLocations.length; i++) {
+        _markers.add(
+          Marker(
+            markerId: MarkerId('radar_zone_$i'),
+            position: radarLocations[i],
+            infoWindow: const InfoWindow(
+              title: '📷 Radar Fixe',
+              snippet: 'Attention à votre vitesse',
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> _checkLocationPermissionAndStart() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+
+    if (permission == LocationPermission.deniedForever) return;
+
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 2,
+    );
+
+    _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen((Position position) {
+      setState(() {
+        double speedKmh = (position.speed >= 0) ? position.speed * 3.6 : 0.0;
+        _currentSpeed = speedKmh < 0.8 ? 0.0 : speedKmh;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Trott GPS - Satellite & Trajets'),
-        backgroundColor: Colors.black87,
+        title: const Text('Trott GPS - Radars & Police'),
+        backgroundColor: Colors.grey[900],
       ),
       body: Stack(
         children: [
-          // 1. La carte satellite en fond
-          const GoogleMap(
+          // 1. La carte satellite en fond avec police et radars
+          GoogleMap(
             mapType: MapType.satellite,
             initialCameraPosition: _initialPosition,
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
+            markers: _markers,
+            onMapCreated: (GoogleMapController controller) {
+              _controller = controller;
+            },
           ),
 
-          // 2. Le panneau d'options de trajets en haut
+          // 2. Le compteur de vitesse style Waze-clean en haut à gauche
           Positioned(
-            top: 10,
-            left: 10,
-            right: 10,
+            top: 20,
+            left: 20,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.75),
-                borderRadius: BorderRadius.circular(10),
+                color: Colors.black.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.cyanAccent.withOpacity(0.5), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _currentSpeed.toStringAsFixed(0),
+                    style: const TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.cyanAccent,
+                      height: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'KM/H',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ],
       ),
       bottomNavigationBar: Container(
-        color: Colors.black87,
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        color: Colors.grey[900],
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: _routeTypes.map((type) {
@@ -78,20 +211,19 @@ class _MapScreenState extends State<MapScreen> {
             return ChoiceChip(
               label: Text(type),
               selected: isSelected,
-              selectedColor: Colors.blueAccent,
+              selectedColor: Colors.cyan,
               backgroundColor: Colors.grey[800],
               labelStyle: TextStyle(
-                color: isSelected ? Colors.white : Colors.white70,
+                color: isSelected ? Colors.black : Colors.white70,
                 fontWeight: FontWeight.bold,
               ),
               onSelected: (bool selected) {
                 setState(() {
                   _selectedRouteType = type;
                 });
-                // Action selon le mode choisi (ex: recalculer l'itinéraire trottinette)
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Mode sélectionné : $type'),
+                    content: Text('Mode de trajet : $type activé'),
                     duration: const Duration(seconds: 1),
                   ),
                 );
