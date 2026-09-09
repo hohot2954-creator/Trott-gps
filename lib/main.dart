@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const TrottGpsApp());
 }
 
@@ -63,12 +64,16 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _initTts() async {
     _flutterTts = FlutterTts();
-    await _flutterTts.setLanguage("fr-FR");
-    await _flutterTts.setSpeechRate(0.5);
+    try {
+      await _flutterTts.setLanguage("fr-FR");
+      await _flutterTts.setSpeechRate(0.5);
+    } catch (_) {}
   }
 
   Future<void> _speak(String text) async {
-    await _flutterTts.speak(text);
+    try {
+      await _flutterTts.speak(text);
+    } catch (_) {}
   }
 
   void _toggleSession() {
@@ -209,43 +214,43 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _checkLocationPermissionAndStart() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return;
+      }
+      if (permission == LocationPermission.deniedForever) return;
 
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
-    }
-    if (permission == LocationPermission.deniedForever) return;
+      const LocationSettings locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 2,
+      );
 
-    const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 2,
-    );
+      _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen((Position position) {
+        if (!mounted) return;
+        setState(() {
+          double speedKmh = (position.speed >= 0) ? position.speed * 3.6 : 0.0;
+          _currentSpeed = speedKmh < 0.8 ? 0.0 : speedKmh;
 
-    _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen((Position position) {
-      setState(() {
-        double speedKmh = (position.speed >= 0) ? position.speed * 3.6 : 0.0;
-        _currentSpeed = speedKmh < 0.8 ? 0.0 : speedKmh;
-
-        if (_isSessionActive && _lastPosition != null) {
-          double distanceInMeters = Geolocator.distanceBetween(
-            _lastPosition!.latitude,
-            _lastPosition!.longitude,
-            position.latitude,
-            position.longitude,
-          );
-          if (distanceInMeters > 1.0 && distanceInMeters < 100.0) {
-            _totalDistanceMeters += distanceInMeters;
+          if (_isSessionActive && _lastPosition != null) {
+            double distanceInMeters = Geolocator.distanceBetween(
+              _lastPosition!.latitude,
+              _lastPosition!.longitude,
+              position.latitude,
+              position.longitude,
+            );
+            if (distanceInMeters > 1.0 && distanceInMeters < 100.0) {
+              _totalDistanceMeters += distanceInMeters;
+            }
           }
-        }
-        _lastPosition = position;
+          _lastPosition = position;
+        });
       });
-    });
+    } catch (_) {}
   }
 
   @override
@@ -276,7 +281,7 @@ class _MapScreenState extends State<MapScreen> {
       body: Stack(
         children: [
           GoogleMap(
-            mapType: MapType.satellite,
+            mapType: MapType.normal,
             initialCameraPosition: _initialPosition,
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
