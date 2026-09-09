@@ -109,7 +109,6 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  // Fonction pour ajouter un signalement communautaire en direct sur la carte
   void _addCommunityAlert(String type, LatLng position) {
     String markerIdVal = 'alert_${DateTime.now().millisecondsSinceEpoch}';
     String title = '';
@@ -136,22 +135,21 @@ class _MapScreenState extends State<MapScreen> {
           icon: BitmapDescriptor.defaultMarkerWithHue(
             type == 'danger' ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueAzure,
           ),
-          infoWindow: InfoWindow(title: title, snippet: 'Ajouté par la communauté à l\'instant'),
+          infoWindow: InfoWindow(title: title, snippet: 'Ajouté par la communauté'),
         ),
       );
     });
 
-    _speak("Alerte $title enregistrée et partagée");
+    _speak("Alerte $title enregistrée");
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("Signalement '$title' publié avec succès !"),
+        content: Text("Signalement '$title' publié !"),
         backgroundColor: Colors.blueGrey,
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  // Ouvre le menu de choix pour signaler un événement autour de soi
   void _showReportDialog() {
     if (_lastPosition == null) {
       ScaffoldMessenger.of(context).showSnackBar(
