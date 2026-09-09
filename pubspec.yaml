@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  google_maps_flutter: ^2.5.3  # <- Ajout de la carte Google Maps
 
 flutter:
   uses-material-design: true
