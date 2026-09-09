@@ -1,0 +1,59 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Nuke old files and generate fresh project
+        run: |
+          # On sauvegarde le pubspec.yaml et le dossier lib (ton code)
+          mkdir -p temp_backup
+          cp pubspec.yaml temp_backup/
+          cp -r lib temp_backup/
+          
+          # On supprime TOUT le reste (les vieux dossiers corrompus android, ios, etc.)
+          rm -rf * .github/workflows/*.yml 2>/dev/null || true
+          
+          # On recrée un projet Flutter flambant neuf et propre (avec le vrai dossier android v2)
+          flutter create . --org com.example.trottgps --project-name trott_gps
+          
+          # On remet ton code et tes dépendances d'origine
+          rm -rf lib pubspec.yaml
+          cp -r temp_backup/lib ./
+          cp temp_backup/pubspec.yaml ./
+          rm -rf temp_backup
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
