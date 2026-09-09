@@ -45,3 +45,9 @@ dependencies:
 
 flutter:
   uses-material-design: true
+dependencies:
+  flutter:
+    sdk: flutter
+  google_maps_flutter: ^2.5.3
+  geolocator: ^10.1.0
+  flutter_tts: ^3.8.5  # <- Pour que l'application puisse te parler
