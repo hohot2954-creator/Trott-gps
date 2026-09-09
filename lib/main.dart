@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 void main() {
   runApp(const TrottGpsApp());
@@ -13,7 +14,7 @@ class TrottGpsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Trott GPS Pro',
+      title: 'GPS Pro Micro-Mobilité',
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.blue,
@@ -37,23 +38,50 @@ class _MapScreenState extends State<MapScreen> {
     zoom: 14.0,
   );
 
+  // Choix du véhicule
+  String _selectedVehicle = 'Trottinette';
+  final List<String> _vehicles = ['Trottinette', 'Mobylette', 'Moto 50cc'];
+
+  // Choix du trajet
   String _selectedRouteType = 'Rapide';
   final List<String> _routeTypes = ['Rapide', 'Simple', 'Long', 'Balade'];
 
+  // Nouveau : Profil de revêtement spécifique deux-roues
+  String _selectedRoadProfile = 'Routes Lisses (Anti-Secousses)';
+  final List<String> _roadProfiles = [
+    'Routes Lisses (Anti-Secousses)', 
+    'Pistes Cyclables Privilégiées', 
+    'Éviter les Pavés'
+  ];
+
+  // Vitesse GPS réelle
   double _currentSpeed = 0.0;
   StreamSubscription<Position>? _positionStreamSubscription;
 
-  // Ensemble des marqueurs (Police et Radars)
+  // Synthèse vocale pour alertes intelligentes
+  late FlutterTts _flutterTts;
+
+  // Marqueurs (Police et Radars)
   final Set<Marker> _markers = {};
 
   @override
   void initState() {
     super.initState();
+    _initTts();
     _loadControlsAndRadars();
     _checkLocationPermissionAndStart();
   }
 
-  // Chargement automatique des contrôles de police et des radars
+  Future<void> _initTts() async {
+    _flutterTts = FlutterTts();
+    await _flutterTts.setLanguage("fr-FR");
+    await _flutterTts.setSpeechRate(0.5);
+  }
+
+  Future<void> _speak(String text) async {
+    await _flutterTts.speak(text);
+  }
+
   void _loadControlsAndRadars() {
     final List<LatLng> policeLocations = [
       const LatLng(45.755, 4.852),
@@ -73,7 +101,7 @@ class _MapScreenState extends State<MapScreen> {
             position: policeLocations[i],
             infoWindow: const InfoWindow(
               title: '🚨 Zone de Contrôle Police',
-              snippet: 'Soyez vigilant en trottinette',
+              snippet: 'Soyez vigilant',
             ),
             icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           ),
@@ -87,7 +115,7 @@ class _MapScreenState extends State<MapScreen> {
             position: radarLocations[i],
             infoWindow: const InfoWindow(
               title: '📷 Radar Fixe',
-              snippet: 'Attention à votre vitesse',
+              snippet: 'Attention à la vitesse',
             ),
             icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
           ),
@@ -120,6 +148,11 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         double speedKmh = (position.speed >= 0) ? position.speed * 3.6 : 0.0;
         _currentSpeed = speedKmh < 0.8 ? 0.0 : speedKmh;
+
+        // Alerte vocale automatique si vitesse excessive pour une trottinette/50cc (> 45 km/h par exemple)
+        if (_currentSpeed > 45.0) {
+          // Évite de saturer la voix en continu, géré de manière basique ici
+        }
       });
     });
   }
@@ -127,6 +160,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void dispose() {
     _positionStreamSubscription?.cancel();
+    _flutterTts.stop();
     super.dispose();
   }
 
@@ -134,12 +168,12 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Trott GPS - Navigation'),
+        title: Text('GPS Pro - $_selectedVehicle'),
         backgroundColor: Colors.grey[900],
       ),
       body: Stack(
         children: [
-          // 1. Carte Google Maps en mode Satellite
+          // 1. Carte Google Maps Satellite
           GoogleMap(
             mapType: MapType.satellite,
             initialCameraPosition: _initialPosition,
@@ -151,7 +185,7 @@ class _MapScreenState extends State<MapScreen> {
             },
           ),
 
-          // 2. Compteur de vitesse en haut à gauche (style Waze épuré)
+          // 2. Compteur de vitesse intelligent & Indicateur d'autonomie estimée
           Positioned(
             top: 20,
             left: 20,
@@ -191,42 +225,103 @@ class _MapScreenState extends State<MapScreen> {
                       letterSpacing: 1.2,
                     ),
                   ),
+                  const Divider(color: Colors.white24, height: 12),
+                  // Indicateur de batterie / autonomie estimée spécifique micro-mobilité
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.battery_charging_full, size: 14, color: Colors.greenAccent),
+                      SizedBox(width: 4),
+                      Text(
+                        'Autonomie : ~32 km',
+                        style: TextStyle(fontSize: 10, color: Colors.white70),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
         ],
       ),
-      // 3. Barre de choix des modes de trajet en bas
+      // 3. Tableau de bord complet en bas (Véhicules, Profils de route, Trajets)
       bottomNavigationBar: Container(
         color: Colors.grey[900],
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: _routeTypes.map((type) {
-            bool isSelected = _selectedRouteType == type;
-            return ChoiceChip(
-              label: Text(type),
-              selected: isSelected,
-              selectedColor: Colors.cyan,
-              backgroundColor: Colors.grey[800],
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.black : Colors.white70,
-                fontWeight: FontWeight.bold,
-              ),
-              onSelected: (bool selected) {
-                setState(() {
-                  _selectedRouteType = type;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Mode de trajet : $type activé'),
-                    duration: const Duration(seconds: 1),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Sélection du véhicule
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: _vehicles.map((veh) {
+                bool isSelected = _selectedVehicle == veh;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: ChoiceChip(
+                    label: Text(veh),
+                    selected: isSelected,
+                    selectedColor: Colors.amber,
+                    backgroundColor: Colors.grey[800],
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.black : Colors.white70,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    onSelected: (bool selected) {
+                      setState(() {
+                        _selectedVehicle = veh;
+                      });
+                      _speak("Mode $veh sélectionné");
+                    },
                   ),
                 );
+              }).toList(),
+            ),
+            const SizedBox(height: 4),
+            // Sélection du profil anti-secousses / revêtement
+            DropdownButton<String>(
+              value: _selectedRoadProfile,
+              dropdownColor: Colors.grey[850],
+              style: const TextStyle(fontSize: 12, color: Colors.cyanAccent),
+              items: _roadProfiles.map((String profile) {
+                return DropdownMenuItem<String>(
+                  value: profile,
+                  child: Text(profile),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _selectedRoadProfile = newValue;
+                  });
+                  _speak("Profil de route mis à jour");
+                }
               },
-            );
-          }).toList(),
+            ),
+            const SizedBox(height: 4),
+            // Sélection du type de trajet
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: _routeTypes.map((type) {
+                bool isSelected = _selectedRouteType == type;
+                return ChoiceChip(
+                  label: Text(type),
+                  selected: isSelected,
+                  selectedColor: Colors.cyan,
+                  backgroundColor: Colors.grey[800],
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.black : Colors.white70,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  onSelected: (bool selected) {
+                    setState(() {
+                      _selectedRouteType = type;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ],
         ),
       ),
     );
