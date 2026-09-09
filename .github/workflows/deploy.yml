@@ -1,4 +1,4 @@
-name: Build APK Definitif
+name: Build APK Ultra Recent
 
 on:
   push:
@@ -21,29 +21,15 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: 'stable'
           cache: true
 
-      - name: Build APK Sans Soucis
+      - name: Build APK Version Finale
         run: |
           flutter --disable-analytics
 
-          # Si le dossier android n'existe pas, on le génère
           if [ ! -d "android" ]; then
-            echo "Génération de la structure Android..."
             flutter create . --org com.example.trottgps --project-name trott_gps
-          fi
-
-          # Forcer le minSdk à 21
-          if [ -f "android/app/build.gradle" ]; then
-            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
-          fi
-
-          # Mettre à jour la version de Kotlin dans settings.gradle (utilisé par Flutter moderne)
-          if [ -f "android/settings.gradle" ]; then
-            echo "Mise à jour de Kotlin dans android/settings.gradle"
-            sed -i 's/version "1.8.22" apply false/version "1.9.0" apply false/g' android/settings.gradle || true
-            sed -i 's/kotlin-version = .*/kotlin-version = "1.9.0"/g' android/settings.gradle || true
           fi
 
           flutter pub get
