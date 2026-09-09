@@ -126,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               backgroundColor: Colors.black87,
               foregroundColor: const Color(0xFF00FFCC),
               onPressed: () => setState(() => isSatellite = !isSatellite),
-              child: Icon(isSatellite ? Icons.map : Icons.sat_alt),
+              child: Icon(isSatellite ? Icons.map : Icons.satellite),
             ),
           ),
 
