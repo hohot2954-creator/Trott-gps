@@ -1,4 +1,4 @@
-name: Build APK Ultra Recent
+name: Build APK Definitif
 
 on:
   push:
@@ -21,45 +21,18 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
+          flutter-version: '3.19.0'
           cache: true
 
-      - name: Build APK Version Finale
+      - name: Build APK Sans Soucis
         run: |
           flutter --disable-analytics
 
+          # Si le dossier android n'existe pas, on le génère automatiquement
           if [ ! -d "android" ]; then
+            echo "Génération de la structure Android du projet..."
             flutter create . --org com.example.trottgps --project-name trott_gps
           fi
-
-          # Écraser proprement android/settings.gradle pour fixer la version de Kotlin à 1.9.20 et éviter tout conflit
-          cat << 'EOF' > android/settings.gradle
-          pluginManagement {
-              def flutterSdkPath = {
-                  def properties = new Properties()
-                  file("local.properties").withInputStream { properties.load(it) }
-                  def flutterSdkPath = properties.getProperty("flutter.sdk")
-                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
-                  return flutterSdkPath
-              }()
-
-              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
-
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-
-          plugins {
-              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-              id "com.android.application" version "7.3.0" apply false
-              id "org.jetbrains.kotlin.android" version "1.9.20" apply false
-          }
-
-          include ":app"
-          EOF
 
           flutter pub get
           flutter build apk --debug
