@@ -1,53 +1,286 @@
-name: trott_gps
-description: Application GPS Trottinette
-publish_to: 'none'
-version: 1.0.0+1
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
-environment:
-  sdk: '>=3.0.0 <4.0.0'
+void main() {
+  runApp(const TrottGpsApp());
+}
 
-dependencies:
-  flutter:
-    sdk: flutter
-  google_maps_flutter: ^2.5.3  # <- Ajout de la carte Google Maps
+class TrottGpsApp extends StatelessWidget {
+  const TrottGpsApp({super.key});
 
-flutter:
-  uses-material-design: true
-name: trott_gps
-description: Application GPS Trottinette
-publish_to: 'none'
-version: 1.0.0+1
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'GPS Trottinette, Mobylette & 50cc',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primarySwatch: Colors.blue,
+      ),
+      home: const MapScreen(),
+    );
+  }
+}
 
-environment:
-  sdk: '>=3.0.0 <4.0.0'
+class MapScreen extends StatefulWidget {
+  const MapScreen({super.key});
 
-dependencies:
-  flutter:
-    sdk: flutter
-  google_maps_flutter: ^2.5.3
-  geolocator: ^10.1.0
+  @override
+  State<MapScreen> createState() => _MapScreenState();
+}
 
-flutter:
-  uses-material-design: true
-name: trott_gps
-description: Application GPS Trottinette
-publish_to: 'none'
-version: 1.0.0+1
+class _MapScreenState extends State<MapScreen> {
+  GoogleMapController? _controller;
+  static const CameraPosition _initialPosition = CameraPosition(
+    target: LatLng(45.75, 4.85),
+    zoom: 14.0,
+  );
 
-environment:
-  sdk: '>=3.0.0 <4.0.0'
+  // Choix du véhicule
+  String _selectedVehicle = 'Trottinette';
+  final List<String> _vehicles = ['Trottinette', 'Mobylette', 'Moto 50cc'];
 
-dependencies:
-  flutter:
-    sdk: flutter
-  google_maps_flutter: ^2.5.3
-  geolocator: ^10.1.0
+  // Choix du trajet
+  String _selectedRouteType = 'Rapide';
+  final List<String> _routeTypes = ['Rapide', 'Simple', 'Long', 'Balade'];
 
-flutter:
-  uses-material-design: true
-dependencies:
-  flutter:
-    sdk: flutter
-  google_maps_flutter: ^2.5.3
-  geolocator: ^10.1.0
-  flutter_tts: ^3.8.5  # <- Pour que l'application puisse te parler
+  // Vitesse GPS réelle
+  double _currentSpeed = 0.0;
+  StreamSubscription<Position>? _positionStreamSubscription;
+
+  // Synthèse vocale
+  late FlutterTts _flutterTts;
+
+  // Marqueurs (Police et Radars)
+  final Set<Marker> _markers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _initTts();
+    _loadControlsAndRadars();
+    _checkLocationPermissionAndStart();
+  }
+
+  // Initialisation de la voix
+  Future<void> _initTts() async {
+    _flutterTts = FlutterTts();
+    await _flutterTts.setLanguage("fr-FR");
+    await _flutterTts.setSpeechRate(0.5);
+  }
+
+  // Annonce vocale (ex: alertes radars ou police)
+  Future<void> _speak(String text) async {
+    await _flutterTts.speak(text);
+  }
+
+  // Chargement automatique des points de contrôle et radars
+  void _loadControlsAndRadars() {
+    final List<LatLng> policeLocations = [
+      const LatLng(45.755, 4.852),
+      const LatLng(45.742, 4.840),
+    ];
+
+    final List<LatLng> radarLocations = [
+      const LatLng(45.760, 4.865),
+      const LatLng(45.735, 4.830),
+    ];
+
+    setState(() {
+      for (int i = 0; i < policeLocations.length; i++) {
+        _markers.add(
+          Marker(
+            markerId: MarkerId('police_zone_$i'),
+            position: policeLocations[i],
+            infoWindow: const InfoWindow(
+              title: '🚨 Zone de Contrôle Police',
+              snippet: 'Attention sur la route',
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          ),
+        );
+      }
+
+      for (int i = 0; i < radarLocations.length; i++) {
+        _markers.add(
+          Marker(
+            markerId: MarkerId('radar_zone_$i'),
+            position: radarLocations[i],
+            infoWindow: const InfoWindow(
+              title: '📷 Radar Fixe',
+              snippet: 'Attention à votre vitesse',
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          ),
+        );
+      }
+    });
+  }
+
+  // Gestion du GPS et de la vitesse réelle
+  Future<void> _checkLocationPermissionAndStart() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+
+    if (permission == LocationPermission.deniedForever) return;
+
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 2,
+    );
+
+    _positionStreamSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen((Position position) {
+      setState(() {
+        double speedKmh = (position.speed >= 0) ? position.speed * 3.6 : 0.0;
+        _currentSpeed = speedKmh < 0.8 ? 0.0 : speedKmh;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel();
+    _flutterTts.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('GPS - $_selectedVehicle'),
+        backgroundColor: Colors.grey[900],
+      ),
+      body: Stack(
+        children: [
+          // 1. Carte Google Maps Satellite
+          GoogleMap(
+            mapType: MapType.satellite,
+            initialCameraPosition: _initialPosition,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+            markers: _markers,
+            onMapCreated: (GoogleMapController controller) {
+              _controller = controller;
+            },
+          ),
+
+          // 2. Compteur de vitesse en haut à gauche (style Waze épuré)
+          Positioned(
+            top: 20,
+            left: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.cyanAccent.withOpacity(0.5), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _currentSpeed.toStringAsFixed(0),
+                    style: const TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.cyanAccent,
+                      height: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'KM/H',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      // 3. Barre de navigation en bas (Véhicules + Trajets)
+      bottomNavigationBar: Container(
+        color: Colors.grey[900],
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Sélection du véhicule
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: _vehicles.map((veh) {
+                bool isSelected = _selectedVehicle == veh;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: ChoiceChip(
+                    label: Text(veh),
+                    selected: isSelected,
+                    selectedColor: Colors.amber,
+                    backgroundColor: Colors.grey[800],
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.black : Colors.white70,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    onSelected: (bool selected) {
+                      setState(() {
+                        _selectedVehicle = veh;
+                      });
+                      _speak("Mode $veh activé");
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 5),
+            // Sélection du type de trajet
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: _routeTypes.map((type) {
+                bool isSelected = _selectedRouteType == type;
+                return ChoiceChip(
+                  label: Text(type),
+                  selected: isSelected,
+                  selectedColor: Colors.cyan,
+                  backgroundColor: Colors.grey[800],
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.black : Colors.white70,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  onSelected: (bool selected) {
+                    setState(() {
+                      _selectedRouteType = type;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
