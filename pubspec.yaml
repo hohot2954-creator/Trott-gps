@@ -1,39 +1,3 @@
-name: Build APK GPS Route Directe
-
-on:
-  push:
-    branches: [ "main" ]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout depot
-        uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.16.5'
-          cache: true
-
-      - name: Build APK Final et Propre
-        run: |
-          flutter --disable-analytics
-
-          # ON NETTOIE TOUT LE PROJET À LA RACINE SAUF LE DOSSIER .git POUR ÉVITER LES CONFLITS DE FICHIERS DE CONFIG
-          find . -maxdepth 1 ! -name '.' ! -name '..' ! -name '.git' ! -name '.github' -exec rm -rf {} +
-
-          # ON CRÉE UN PROJET FLUTTER NEUF PROPREMENT DE ZÉRO
-          flutter create . --org com.example.trottgps --project-name trott_gps
-
           # ON ÉCRASE LE PUBSPEC.YAML FRAÎCHEMENT CRÉÉ AVEC NOTRE VERSION COMPLÈTE ET SA CONTRAINTE SDK VALIDE
           rm -f pubspec.yaml
           cat << 'EOF' > pubspec.yaml
