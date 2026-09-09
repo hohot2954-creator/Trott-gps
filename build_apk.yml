@@ -1,99 +1,14 @@
-name: Build Flutter APK
+name: trott_gps
+description: Application GPS Trottinette
+publish_to: 'none'
+version: 1.0.0+1
 
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+environment:
+  sdk: '>=3.0.0 <4.0.0'
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+dependencies:
+  flutter:
+    sdk: flutter
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java Environment
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Set up Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-          channel: 'stable'
-          cache: false
-
-      - name: Diagnostic - Flutter Doctor Check
-        run: flutter doctor
-
-      - name: Nuclear Option - Total Reset and Modern v2 Generation
-        run: |
-          echo "=================================================="
-          echo "=== 1. Sauvegarde sécurisée de ton code source ==="
-          echo "=================================================="
-          mkdir -p backup_source
-          if [ -d "lib" ]; then 
-            cp -r lib backup_source/
-            echo "Dossier lib sauvegardé."
-          fi
-          if [ -f "pubspec.yaml" ]; then 
-            cp pubspec.yaml backup_source/
-            echo "Fichier pubspec.yaml sauvegardé."
-          fi
-
-          echo "=================================================="
-          echo "=== 2. Nettoyage total de l'espace de travail ==="
-          echo "=================================================="
-          rm -rf ./* ./.[!.]* 2>/dev/null || true
-          echo "Espace de travail purgé de tout résidu fantôme."
-
-          echo "=================================================="
-          echo "=== 3. Génération d'un projet Flutter neuf v2 ==="
-          echo "=================================================="
-          flutter create . --org com.example.trottgps --project-name trott_gps
-          echo "Structure native Android v2 générée avec succès."
-
-          echo "=================================================="
-          echo "=== 4. Restauration de ton code source d'origine ==="
-          echo "=================================================="
-          if [ -d "backup_source/lib" ]; then
-            rm -rf lib
-            cp -r backup_source/lib ./
-            echo "Dossier lib restauré."
-          fi
-          if [ -f "backup_source/pubspec.yaml" ]; then
-            rm -f pubspec.yaml
-            cp backup_source/pubspec.yaml ./
-            echo "Fichier pubspec.yaml restauré."
-          fi
-          rm -rf backup_source
-          echo "Sauvegarde temporaire nettoyée."
-
-          echo "=================================================="
-          echo "=== 5. Vérification et blindage de l'embedding v2 ==="
-          echo "=================================================="
-          if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
-            sed -i 's/android:value="1"/android:value="2"/g' android/app/src/main/AndroidManifest.xml || true
-            echo "AndroidManifest.xml vérifié et forcé en v2."
-          fi
-          
-          if [ -f "android/gradle.properties" ]; then
-            echo "flutter.embedding.version=2" >> android/gradle.properties
-            echo "Propriété d'embedding v2 ajoutée à gradle.properties."
-          fi
-
-      - name: Install Project Dependencies
-        run: flutter pub get
-
-      - name: Build Debug APK Package
-        run: flutter build apk --debug
-
-      - name: Upload APK Artifact Result
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
+flutter:
+  uses-material-design: true
