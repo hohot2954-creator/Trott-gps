@@ -28,11 +28,12 @@ jobs:
         run: |
           flutter --disable-analytics
 
+          # 1. On crée le projet s'il n'existe pas
           if [ ! -d "android" ]; then
             flutter create . --org com.example.trottgps --project-name trott_gps
           fi
 
-          # Génération propre ligne par ligne du pubspec.yaml sans aucune erreur de syntaxe YAML
+          # 2. ON ÉCRASE LE PUBSPEC.YAML APRÈS LA CRÉATION (pour être sûr qu'il n'est pas écrasé)
           rm -f pubspec.yaml
           touch pubspec.yaml
           echo "name: trott_gps" >> pubspec.yaml
@@ -60,7 +61,7 @@ jobs:
           echo "flutter:" >> pubspec.yaml
           echo "  uses-material-design: true" >> pubspec.yaml
 
-          # Forcer le minSdk à 21
+          # 3. Forcer le minSdk à 21
           if [ -f "android/app/build.gradle" ]; then
             sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
           fi
