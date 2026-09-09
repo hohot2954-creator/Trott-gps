@@ -38,30 +38,17 @@ class _MapScreenState extends State<MapScreen> {
     zoom: 14.0,
   );
 
-  // Choix du véhicule
-  String _selectedVehicle = 'Trottinette';
-  final List<String> _vehicles = ['Trottinette', 'Mobylette', 'Moto 50cc'];
+  // Catégories unifiées (Trottinette, Mobylette, Moto 50cc)
+  String _selectedCategory = 'Trottinette';
+  final List<String> _categories = ['Trottinette', 'Mobylette', 'Moto 50cc'];
 
-  // Choix du trajet
+  // Types de trajets et profils regroupés
   String _selectedRouteType = 'Rapide';
   final List<String> _routeTypes = ['Rapide', 'Simple', 'Long', 'Balade'];
 
-  // Nouveau : Profil de revêtement spécifique deux-roues
-  String _selectedRoadProfile = 'Routes Lisses (Anti-Secousses)';
-  final List<String> _roadProfiles = [
-    'Routes Lisses (Anti-Secousses)', 
-    'Pistes Cyclables Privilégiées', 
-    'Éviter les Pavés'
-  ];
-
-  // Vitesse GPS réelle
   double _currentSpeed = 0.0;
   StreamSubscription<Position>? _positionStreamSubscription;
-
-  // Synthèse vocale pour alertes intelligentes
   late FlutterTts _flutterTts;
-
-  // Marqueurs (Police et Radars)
   final Set<Marker> _markers = {};
 
   @override
@@ -148,11 +135,6 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         double speedKmh = (position.speed >= 0) ? position.speed * 3.6 : 0.0;
         _currentSpeed = speedKmh < 0.8 ? 0.0 : speedKmh;
-
-        // Alerte vocale automatique si vitesse excessive pour une trottinette/50cc (> 45 km/h par exemple)
-        if (_currentSpeed > 45.0) {
-          // Évite de saturer la voix en continu, géré de manière basique ici
-        }
       });
     });
   }
@@ -168,12 +150,11 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('GPS Pro - $_selectedVehicle'),
+        title: Text('GPS - Mode : $_selectedCategory'),
         backgroundColor: Colors.grey[900],
       ),
       body: Stack(
         children: [
-          // 1. Carte Google Maps Satellite
           GoogleMap(
             mapType: MapType.satellite,
             initialCameraPosition: _initialPosition,
@@ -184,8 +165,6 @@ class _MapScreenState extends State<MapScreen> {
               _controller = controller;
             },
           ),
-
-          // 2. Compteur de vitesse intelligent & Indicateur d'autonomie estimée
           Positioned(
             top: 20,
             left: 20,
@@ -226,14 +205,13 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
                   const Divider(color: Colors.white24, height: 12),
-                  // Indicateur de batterie / autonomie estimée spécifique micro-mobilité
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.battery_charging_full, size: 14, color: Colors.greenAccent),
+                      Icon(Icons.bolt, size: 14, color: Colors.amberAccent),
                       SizedBox(width: 4),
                       Text(
-                        'Autonomie : ~32 km',
+                        'Optimisé Micro-Mobilité',
                         style: TextStyle(fontSize: 10, color: Colors.white70),
                       ),
                     ],
@@ -244,22 +222,21 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ],
       ),
-      // 3. Tableau de bord complet en bas (Véhicules, Profils de route, Trajets)
       bottomNavigationBar: Container(
         color: Colors.grey[900],
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Sélection du véhicule
+            // Barre unique de sélection de catégorie (Trottinette / Mobylette / Moto 50cc)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: _vehicles.map((veh) {
-                bool isSelected = _selectedVehicle == veh;
+              children: _categories.map((cat) {
+                bool isSelected = _selectedCategory == cat;
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
                   child: ChoiceChip(
-                    label: Text(veh),
+                    label: Text(cat),
                     selected: isSelected,
                     selectedColor: Colors.amber,
                     backgroundColor: Colors.grey[800],
@@ -269,37 +246,16 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                     onSelected: (bool selected) {
                       setState(() {
-                        _selectedVehicle = veh;
+                        _selectedCategory = cat;
                       });
-                      _speak("Mode $veh sélectionné");
+                      _speak("Profil $cat activé");
                     },
                   ),
                 );
               }).toList(),
             ),
-            const SizedBox(height: 4),
-            // Sélection du profil anti-secousses / revêtement
-            DropdownButton<String>(
-              value: _selectedRoadProfile,
-              dropdownColor: Colors.grey[850],
-              style: const TextStyle(fontSize: 12, color: Colors.cyanAccent),
-              items: _roadProfiles.map((String profile) {
-                return DropdownMenuItem<String>(
-                  value: profile,
-                  child: Text(profile),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                if (newValue != null) {
-                  setState(() {
-                    _selectedRoadProfile = newValue;
-                  });
-                  _speak("Profil de route mis à jour");
-                }
-              },
-            ),
-            const SizedBox(height: 4),
-            // Sélection du type de trajet
+            const SizedBox(height: 8),
+            // Barre unique des types de trajets
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: _routeTypes.map((type) {
