@@ -27,8 +27,10 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Create Android files
-        run: flutter create . --platforms=android --org com.example.trottgps
+      - name: Generate Android platform files
+        run: |
+          rm -rf android
+          flutter create . --platforms=android --org com.example.trottgps
 
       - name: Install dependencies
         run: flutter pub get
