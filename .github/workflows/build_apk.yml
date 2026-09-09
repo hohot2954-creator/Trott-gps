@@ -1,74 +1,8 @@
-name: Build Flutter APK
-
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java Environment
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Set up Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-          channel: 'stable'
-          cache: false
-
-      - name: Diagnostic - Flutter Doctor
-        run: flutter doctor
-
-      - name: Full Generation and Build Sequence
+      - name: Build Debug APK avec déblocage Gradle
         run: |
-          echo "=================================================="
-          echo "=== Étape 1 : Sauvegarde du code source existant ==="
-          echo "=================================================="
-          mkdir -p temp_backup
-          if [ -d "lib" ]; then cp -r lib temp_backup/; fi
-          if [ -f "pubspec.yaml" ]; then cp pubspec.yaml temp_backup/; fi
-
-          echo "=================================================="
-          echo "=== Étape 2 : Nettoyage total de l'espace ==="
-          echo "=================================================="
-          rm -rf ./* ./.[!.]* 2>/dev/null || true
-
-          echo "=================================================="
-          echo "=== Étape 3 : Création d'un projet Flutter v2 neuf ==="
-          echo "=================================================="
-          flutter create . --org com.example.trottgps --project-name trott_gps
-
-          echo "=================================================="
-          echo "=== Étape 4 : Restauration de votre code source ==="
-          echo "=================================================="
-          if [ -d "temp_backup/lib" ]; then
-            rm -rf lib
-            cp -r temp_backup/lib ./
-          fi
-          if [ -f "temp_backup/pubspec.yaml" ]; then
-            rm -f pubspec.yaml
-            cp temp_backup/pubspec.yaml ./
-          fi
-          rm -rf temp_backup
-
-          echo "=================================================="
-          echo "=== Étape 5 : Récupération des dépendances & Build ==="
-          echo "=================================================="
+          cd android
+          ./gradlew clean
+          cd ..
+          flutter clean
           flutter pub get
           flutter build apk --debug
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk          path: build/app/outputs/flutter-apk/app-debug.apk
