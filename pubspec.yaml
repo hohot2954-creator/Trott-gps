@@ -1,4 +1,4 @@
-name: Build APK Zero Erreur
+name: Build APK Sur-Bousté 80000%
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
           flutter-version: '3.16.5'
           cache: true
 
-      - name: Build APK Final
+      - name: Build APK Ultra Propre
         run: |
           flutter --disable-analytics
 
@@ -32,32 +32,35 @@ jobs:
             flutter create . --org com.example.trottgps --project-name trott_gps
           fi
 
-          # Écriture propre du pubspec.yaml sans espaces parasites
-          echo "name: trott_gps" > pubspec.yaml
-          echo "description: GPS Pro pour micro-mobilite" >> pubspec.yaml
-          echo "publish_to: 'none'" >> pubspec.yaml
-          echo "version: 1.0.0+1" >> pubspec.yaml
-          echo "" >> pubspec.yaml
-          echo "environment:" >> pubspec.yaml
-          echo "  sdk: '>=3.0.0 <4.0.0'" >> pubspec.yaml
-          echo "" >> pubspec.yaml
-          echo "dependencies:" >> pubspec.yaml
-          echo "  flutter:" >> pubspec.yaml
-          echo "    sdk: flutter" >> pubspec.yaml
-          echo "  flutter_map: ^6.1.0" >> pubspec.yaml
-          echo "  latlong2: ^0.9.0" >> pubspec.yaml
-          echo "  geolocator: ^10.1.0" >> pubspec.yaml
-          echo "  flutter_tts: ^3.8.3" >> pubspec.yaml
-          echo "  http: ^1.2.0" >> pubspec.yaml
-          echo "" >> pubspec.yaml
-          echo "dev_dependencies:" >> pubspec.yaml
-          echo "  flutter_test:" >> pubspec.yaml
-          echo "    sdk: flutter" >> pubspec.yaml
-          echo "  flutter_lints: ^3.0.0" >> pubspec.yaml
-          echo "" >> pubspec.yaml
-          echo "flutter:" >> pubspec.yaml
-          echo "  uses-material-design: true" >> pubspec.yaml
+          # Injection directe et parfaite du pubspec.yaml sans aucune erreur de contrainte
+          cat << 'EOF' > pubspec.yaml
+          name: trott_gps
+          description: GPS Pro pour micro-mobilite
+          publish_to: 'none'
+          version: 1.0.0+1
 
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+
+          dependencies:
+            flutter:
+              sdk: flutter
+            flutter_map: ^6.1.0
+            latlong2: ^0.9.0
+            geolocator: ^10.1.0
+            flutter_tts: ^3.8.3
+            http: ^1.2.0
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^3.0.0
+
+          flutter:
+            uses-material-design: true
+          EOF
+
+          # Forcer le minSdk à 21 pour valider tous les plugins natifs
           if [ -f "android/app/build.gradle" ]; then
             sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
           fi
