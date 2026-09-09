@@ -32,14 +32,38 @@ jobs:
             flutter create . --org com.example.trottgps --project-name trott_gps
           fi
 
+          # Écraser proprement android/settings.gradle pour fixer la version de Kotlin à 1.9.20 et éviter tout conflit
+          cat << 'EOF' > android/settings.gradle
+          pluginManagement {
+              def flutterSdkPath = {
+                  def properties = new Properties()
+                  file("local.properties").withInputStream { properties.load(it) }
+                  def flutterSdkPath = properties.getProperty("flutter.sdk")
+                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+                  return flutterSdkPath
+              }()
+
+              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          plugins {
+              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+              id "com.android.application" version "7.3.0" apply false
+              id "org.jetbrains.kotlin.android" version "1.9.20" apply false
+          }
+
+          include ":app"
+          EOF
+
           flutter pub get
           flutter build apk --debug
 
-      - name: Stocker l'APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
       - name: Stocker l'APK
         uses: actions/upload-artifact@v4
         with:
