@@ -28,10 +28,15 @@ jobs:
         run: |
           flutter --disable-analytics
 
-          # Si le dossier android n'existe pas, on le génère automatiquement
+          # Si le dossier android n'existe pas, on le génère
           if [ ! -d "android" ]; then
-            echo "Génération de la structure Android du projet..."
+            echo "Génération de la structure Android..."
             flutter create . --org com.example.trottgps --project-name trott_gps
+          fi
+
+          # FORCER le minSdk à 21 pour éviter l'échec de Gradle avec les plugins récents
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
           fi
 
           flutter pub get
